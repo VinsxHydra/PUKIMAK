@@ -1,0 +1,35 @@
+import subprocess
+import os
+
+INPUT_FILE = "roots.txt2"
+OUTPUT_FILE = "alldomain.txt"
+MAX_RETRY = 10
+
+def run_subfinder():
+    cmd = ["subfinder", "-dL", INPUT_FILE, "-o", OUTPUT_FILE, "-silent"]
+    subprocess.run(cmd)
+
+def is_file_not_empty(file_path):
+    return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+
+retry = 1
+
+while retry <= MAX_RETRY:
+    print(f"[+] Percobaan ke-{retry}...")
+
+    run_subfinder()
+
+    if is_file_not_empty(OUTPUT_FILE):
+        with open(OUTPUT_FILE) as f:
+            total = len(f.readlines())
+        print(f"[✔] Berhasil! Total domain: {total}")
+        break
+    else:
+        print("[!] Hasil kosong, retry...")
+        if os.path.exists(OUTPUT_FILE):
+            os.remove(OUTPUT_FILE)
+
+    retry += 1
+
+if retry > MAX_RETRY:
+    print(f"[✘] Gagal setelah {MAX_RETRY} percobaan.")
