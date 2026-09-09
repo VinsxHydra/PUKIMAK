@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <user> <password> <network>"
+    echo "Example: $0 root password 192.168.1"
+    exit 1
+fi
+
+USER="$1"
+PASS="$2"
+NETWORK="$3"
+
+OUTPUT="live.txt"
+> "$OUTPUT"
+
+echo "Scanning ${NETWORK}.1-250..."
+
+for i in $(seq 1 250); do
+    IP="${NETWORK}.${i}"
+
+    printf "\rChecking %-15s" "$IP"
+
+    RESULT=$(timeout 5 sshpass -p "$PASS" ssh \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=3 \
+        "$USER@$IP" "uname -a" 2>/dev/null)
+
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "[OK] $IP"
+        echo "     $RESULT"
+        echo "$IP | $RESULT" >> "$OUTPUT"
+    fi
+done
+
+echo ""
+echo "=============================="
+echo "Scan selesai."
+echo "Hasil disimpan di $OUTPUT"
+echo "=============================="
