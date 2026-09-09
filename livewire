@@ -1,0 +1,66 @@
+#!/bin/bash
+
+input_file=$1
+output_file="livewire_result.txt"
+
+> "$output_file"
+
+scan() {
+    domain=$1
+
+    [ -z "$domain" ] && return
+
+    # normalize (hapus http/https kalau ada)
+    domain=$(echo "$domain" | sed 's|http[s]*://||')
+
+    # coba https dulu
+    url="https://$domain"
+    if ! curl -Is --max-time 5 -A "Mozilla/5.0" "$url" > /dev/null 2>&1; then
+        url="http://$domain"
+    fi
+
+    echo "Scanning: $url"
+
+    # ambil HTML
+    html=$(curl -Ls --max-time 10 -A "Mozilla/5.0" "$url")
+    if [ -z "$html" ]; then
+        echo "$url => DEAD / TIMEOUT" >> "$output_file"
+        return
+    fi
+
+    score=0
+
+    # ===== HTML detection =====
+    if echo "$html" | grep -Eiq "wire:(id|click|model)"; then
+        score=$((score+5))
+    fi
+
+    # ===== JS detection =====
+    if echo "$html" | grep -Eiq "livewire\.js|window\.Livewire"; then
+        score=$((score+3))
+    fi
+
+    # ===== Endpoint detection =====
+    response=$(curl -s -A "Mozilla/5.0" -X POST "$url/livewire/message/test")
+
+    if echo "$response" | grep -iq "livewire\|csrf\|laravel"; then
+        score=$((score+4))
+    fi
+
+    # ===== Final decision =====
+    if [ $score -ge 7 ]; then
+        echo "$url => STRONG LIVEWIRE ($score)" >> "$output_file"
+    elif [ $score -ge 4 ]; then
+        echo "$url => POSSIBLE LIVEWIRE ($score)" >> "$output_file"
+    else
+        echo "$url => NOT DETECTED ($score)" >> "$output_file"
+    fi
+}
+
+export -f scan
+export output_file
+
+# parallel (10 thread)
+cat "$input_file" | xargs -I{} -P 10 bash -c 'scan "{}"'
+
+echo "Done. Hasil di $output_file"
